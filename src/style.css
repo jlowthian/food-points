@@ -658,3 +658,268 @@ select:focus-visible {
     border-radius: 20px;
   }
 }
+
+@keyframes food-logged {
+  0% {
+    background-color: var(--green-light);
+    transform: scale(1);
+  }
+  50% {
+    background-color: #dce8d2;
+    transform: scale(1.015);
+  }
+  100% {
+    background-color: var(--surface);
+    transform: scale(1);
+  }
+}
+
+.food-card.logged-feedback {
+  animation: food-logged 450ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .food-card.logged-feedback {
+    animation: none;
+  }
+}
+
+.target-form {
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid #ffffff30;
+}
+
+.target-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: #c4d0c5;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.target-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.target-controls input {
+  width: 100px;
+  min-width: 0;
+  padding: 10px;
+  color: var(--green);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.target-controls .button {
+  color: var(--green);
+  background: var(--green-light);
+}
+
+.category-filters {
+  margin-top: 18px;
+}
+
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-chip {
+  padding: 8px 12px;
+  color: var(--green);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.category-chip.selected {
+  color: white;
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.category-chip:focus-visible {
+  outline: 3px solid #90b49b;
+  outline-offset: 2px;
+}
+
+.log-action {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+.log-feedback {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: #267344;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.log-feedback-show {
+  animation: log-feedback-in 1.6s ease forwards;
+}
+
+@keyframes log-feedback-in {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(-50% + 4px));
+  }
+  15%,
+  70% {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-50% - 3px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-feedback-show {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.bulk-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.bulk-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.log-select {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.target-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-target-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 16px;
+  transition:
+    opacity 150ms ease,
+    background 150ms ease;
+}
+
+.edit-target-button:hover,
+.edit-target-button:focus-visible {
+  opacity: 1;
+  background: #ffffff20;
+}
+
+.target-form {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff30;
+}
+
+.target-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: #c4d0c5;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.target-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.target-controls input {
+  width: 90px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: white;
+  color: var(--green);
+}
+
+.target-controls .button {
+  color: var(--green);
+  background: var(--green-light);
+}
+
+.target-controls .button-cancel {
+  color: #c4d0c5;
+  background: transparent;
+  border: 1px solid #ffffff40;
+}
+
+.target-form {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.target-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.target-controls input {
+  box-sizing: border-box;
+  width: 90px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.target-controls button {
+  max-width: 100%;
+}
+
+#new-category-field {
+  margin-top: 12px;
+}
+
+#new-category-field[hidden] {
+  display: none;
+}

@@ -3,7 +3,7 @@ import "./style.css";
 
 const DB_NAME = "food-points-db";
 const DB_VERSION = 1;
-const DEFAULT_TARGET = -50;
+const DEFAULT_TARGET = -35;
 
 const INITIAL_FOODS = [
   {
@@ -57,12 +57,15 @@ let db;
 let foods = [];
 let entries = [];
 let target = DEFAULT_TARGET;
+let editingTarget = false;
 let selectedWeek = mondayKey(new Date());
 let notice = "";
 let searchTerm = "";
 let showAllFoods = false;
+let selectedCategories = new Set();
 let editingFoodId = null;
 let addingFood = false;
+let selectedEntryIds = new Set();
 
 function mondayKey(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
@@ -246,14 +249,67 @@ function renderDashboard() {
         </div>
         <span class="status ${ok ? "good" : "warning"}">${status}</span>
       </div>
+
       <div class="score-track">
-        <div class="score-fill ${ok ? "" : "over"}" style="width:${progress}%"></div>
+        <div
+          class="score-fill ${ok ? "" : "over"}"
+          style="width:${progress}%"
+        ></div>
       </div>
+
       <div class="score-meta">
-        <span>Target: ${formatPoints(target)}</span>
-        <span>${ok ? `${difference} points until target` : `${difference} points beyond target`}</span>
+        <div class="target-display">
+          <span>Target: ${formatPoints(target)}</span>
+          <button
+            type="button"
+            class="edit-target-button"
+            data-action="edit-target"
+            aria-label="Edit weekly target"
+            title="Edit weekly target"
+          >✎</button>
+        </div>
+
+        <span>
+          ${
+            ok
+              ? `${difference} points until target`
+              : `${difference} points beyond target`
+          }
+        </span>
       </div>
-      <p class="small muted">Your week runs Monday to Sunday.</p>
+
+      ${
+        editingTarget
+          ? `
+            <form id="target-form" class="target-form">
+              <label for="target-input">Weekly target</label>
+              <div class="target-controls">
+                <input
+                  id="target-input"
+                  name="target"
+                  type="number"
+                  min="-1000"
+                  max="0"
+                  step="1"
+                  value="${target}"
+                  required
+                  autofocus
+                />
+                <button type="submit" class="button button-secondary">
+                  Save
+                </button>
+                <button
+                  type="button"
+                  class="button button-cancel"
+                  data-action="cancel-target"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          `
+          : ""
+      }
     </section>
   `;
 }
@@ -267,7 +323,11 @@ function renderFood(food) {
         <p class="penalty">−${Number(food.points)} points</p>
       </div>
       <div class="food-actions">
-        <button class="button button-primary" data-action="log" data-id="${food.id}">Log</button>
+        <span class="log-action">
+  <button class="button button-primary"
+    data-action="log" data-id="${food.id}">Log</button>
+  <span class="log-feedback" aria-live="polite"></span>
+</span>
         <button class="button button-secondary" data-action="edit-food" data-id="${food.id}">Edit</button>
       </div>
     </article>
@@ -278,14 +338,21 @@ function renderFoodSearch() {
   const active = foods.filter((f) => f.active !== false);
   const query = searchTerm.trim().toLowerCase();
 
-  const results = query
-    ? active.filter((f) =>
-        `${f.name} ${f.category}`.toLowerCase().includes(query),
-      )
-    : showAllFoods
-      ? active
-      : [];
+  const categories = [
+    ...new Set(active.map((food) => food.category || "Other")),
+  ].sort();
 
+  const results = active.filter((food) => {
+    const matchesSearch = `${food.name} ${food.category || "Other"}`
+      .toLowerCase()
+      .includes(query);
+
+    const matchesCategory =
+      selectedCategories.size === 0 ||
+      selectedCategories.has(food.category || "Other");
+
+    return (query || showAllFoods) && matchesSearch && matchesCategory;
+  });
   return `
     <section class="section food-finder">
       <div class="section-heading">
@@ -310,6 +377,42 @@ function renderFoodSearch() {
           data-action="toggle-all">${showAllFoods ? "Hide all foods" : "All foods"}</button>
         <button class="button button-primary" data-action="add-food">+ Add food</button>
       </div>
+      ${
+        showAllFoods
+          ? `
+      <div class="category-filters">
+        <p class="results-label">Filter by category</p>
+        <div class="category-chips">
+          ${categories
+            .map(
+              (category) => `
+            <button
+              type="button"
+              class="category-chip ${
+                selectedCategories.has(category) ? "selected" : ""
+              }"
+              data-action="toggle-category"
+              data-category="${escapeHTML(category)}"
+              aria-pressed="${selectedCategories.has(category)}"
+            >
+              ${escapeHTML(category)}
+            </button>
+          `,
+            )
+            .join("")}
+        </div>
+        ${
+          selectedCategories.size
+            ? `<button type="button" class="text-button"
+                 data-action="clear-categories">
+                 Clear filters
+               </button>`
+            : ""
+        }
+      </div>
+    `
+          : ""
+      }
 
       ${
         query || showAllFoods
@@ -374,22 +477,42 @@ function renderFoodForm() {
           <p class="field-help">Enter a positive number; it will be deducted from your score.</p>
 
           <label class="field-label" for="food-category">Category</label>
-          <select id="food-category" name="category">
-            ${[
-              "Takeaway",
-              "Drinks",
-              "Sweet treats",
-              "Snacks",
-              "Alcohol",
-              "Meals",
-              "Other",
-            ]
-              .map(
-                (c) =>
-                  `<option value="${c}" ${food.category === c ? "selected" : ""}>${c}</option>`,
-              )
-              .join("")}
-          </select>
+          <label class="field-label" for="food-category">Category</label>
+
+<select id="food-category" name="category">
+  ${[
+    "Takeaway",
+    "Drinks",
+    "Sweet treats",
+    "Snacks",
+    "Alcohol",
+    "Meals",
+    "Other",
+    ...foods.map((f) => f.category).filter(Boolean),
+  ]
+    .filter((c, i, arr) => arr.indexOf(c) === i)
+    .sort()
+    .map(
+      (c) =>
+        `<option value="${escapeHTML(c)}" ${
+          food.category === c ? "selected" : ""
+        }>${escapeHTML(c)}</option>`,
+    )
+    .join("")}
+
+  <option value="__new_category__">+ Create new category…</option>
+</select>
+
+<div id="new-category-field" hidden>
+  <label class="field-label" for="new-category">New category name</label>
+  <input
+    id="new-category"
+    name="newCategory"
+    type="text"
+    maxlength="60"
+    placeholder="e.g. Breakfast"
+  />
+</div>
 
           <div class="modal-actions">
             <button type="button" class="button button-secondary" data-action="close-form">Cancel</button>
@@ -424,18 +547,53 @@ function renderFoodLog() {
     `;
   }
 
+  const allSelected = list.every((entry) => selectedEntryIds.has(entry.id));
+
   return `
+    <div class="bulk-toolbar">
+      <button
+        type="button"
+        class="button button-secondary"
+        data-action="select-all-log">
+        ${allSelected ? "Deselect all" : "Select all"}
+      </button>
+
+      <button
+        type="button"
+        class="button button-primary"
+        data-action="bulk-delete-log"
+        ${selectedEntryIds.size === 0 ? "disabled" : ""}>
+        Delete selected (${selectedEntryIds.size})
+      </button>
+    </div>
+
     <div class="log-list">
       ${list
         .map(
           (entry) => `
         <article class="log-item">
+          <input
+            type="checkbox"
+            class="log-select"
+            aria-label="Select ${escapeHTML(entry.foodName)}"
+            data-entry-select="${entry.id}"
+            ${selectedEntryIds.has(entry.id) ? "checked" : ""}>
+
           <div class="log-details">
             <h3>${escapeHTML(entry.foodName)}</h3>
-            <p class="muted">${formatDate(entry.date)} · ${formatTime(entry.date)}</p>
+            <p class="muted">
+              ${formatDate(entry.date)} · ${formatTime(entry.date)}
+            </p>
           </div>
-          <strong class="penalty">${formatPoints(entry.points)}</strong>
-          <button class="icon-button" data-action="delete" data-id="${entry.id}"
+
+          <strong class="penalty">
+            ${formatPoints(entry.points)}
+          </strong>
+
+          <button
+            class="icon-button"
+            data-action="delete"
+            data-id="${entry.id}"
             aria-label="Delete entry">×</button>
         </article>
       `,
@@ -520,19 +678,44 @@ async function logFood(id) {
     date: new Date().toISOString(),
   });
 
-  notify(`${food.name} logged`);
   await refreshData();
   render();
+
+  const button = app.querySelector(`[data-action="log"][data-id="${food.id}"]`);
+
+  if (button) {
+    const feedback = button.parentElement.querySelector(".log-feedback");
+    feedback.textContent = "✓ Logged!";
+    feedback.classList.remove("log-feedback-show");
+
+    // Restart the animation if this food is logged again quickly.
+    void feedback.offsetWidth;
+    feedback.classList.add("log-feedback-show");
+  }
 }
 
 async function saveFood(form) {
   const data = new FormData(form);
   const name = String(data.get("name") || "").trim();
   const points = Number(data.get("points"));
-  const category = String(data.get("category") || "Other");
+  const selectedCategory = String(data.get("category") || "Other");
 
-  if (!name || !Number.isFinite(points) || points < 0 || points > 1000) {
-    window.alert("Enter a food name and a penalty between 0 and 1000.");
+  const newCategory = String(data.get("newCategory") || "").trim();
+
+  const category =
+    selectedCategory === "__new_category__" ? newCategory : selectedCategory;
+
+  if (
+    !name ||
+    !Number.isFinite(points) ||
+    points < 0 ||
+    points > 1000 ||
+    !category.trim() ||
+    category === "__new_category__"
+  ) {
+    window.alert(
+      "Enter a food name, a valid penalty between 0 and 1000, and a category.",
+    );
     return;
   }
 
@@ -605,6 +788,31 @@ async function deleteEntry(id) {
   render();
 }
 
+async function deleteSelectedEntries() {
+  const ids = [...selectedEntryIds];
+
+  if (ids.length === 0) return;
+
+  const confirmed = window.confirm(
+    `Delete ${ids.length} selected log entries? This cannot be undone.`,
+  );
+
+  if (!confirmed) return;
+
+  const tx = db.transaction("entries", "readwrite");
+
+  for (const id of ids) {
+    tx.store.delete(id);
+  }
+
+  await tx.done;
+
+  selectedEntryIds.clear();
+
+  await refreshData();
+  render();
+}
+
 app.addEventListener("input", (event) => {
   if (event.target.id !== "food-search") return;
 
@@ -623,16 +831,73 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("submit", async (event) => {
-  if (event.target.id !== "food-form") return;
+  const form = event.target;
 
-  event.preventDefault();
-  await saveFood(event.target);
+  if (form.id === "target-form") {
+    event.preventDefault();
+
+    const input = form.querySelector("#target-input");
+    const newTarget = Number(input.value);
+
+    if (!Number.isFinite(newTarget) || newTarget > 0 || newTarget < -1000) {
+      window.alert("Enter a target between -1000 and 0.");
+      return;
+    }
+
+    await db.put("settings", {
+      key: "main",
+      target: newTarget,
+    });
+
+    await refreshData();
+    editingTarget = false;
+    notify("Weekly target updated");
+    render();
+    return;
+  }
+
+  if (form.id === "food-form") {
+    event.preventDefault();
+    await saveFood(form);
+  }
 });
 
 app.addEventListener("change", (event) => {
+  if (event.target.matches("[data-entry-select]")) {
+    const id = Number(event.target.dataset.entrySelect);
+
+    if (event.target.checked) {
+      selectedEntryIds.add(id);
+    } else {
+      selectedEntryIds.delete(id);
+    }
+
+    render();
+    return;
+  }
   if (event.target.id === "week-select") {
     selectedWeek = event.target.value;
     render();
+  }
+});
+
+app.addEventListener("change", (event) => {
+  if (event.target.id !== "food-category") return;
+
+  const field = app.querySelector("#new-category-field");
+  const input = app.querySelector("#new-category");
+
+  if (!field || !input) return;
+
+  const creatingNew = event.target.value === "__new_category__";
+
+  field.hidden = !creatingNew;
+  input.required = creatingNew;
+
+  if (creatingNew) {
+    input.focus();
+  } else {
+    input.value = "";
   }
 });
 
@@ -642,11 +907,66 @@ app.addEventListener("click", async (event) => {
 
   const { action, id, week } = button.dataset;
 
+  if (action === "edit-target") {
+    editingTarget = true;
+    render();
+    return;
+  }
+
+  if (action === "cancel-target") {
+    editingTarget = false;
+    render();
+    return;
+  }
+
+  if (action === "select-all-log") {
+    const visibleEntries = entriesForWeek(selectedWeek);
+    const allSelected = visibleEntries.every((entry) =>
+      selectedEntryIds.has(entry.id),
+    );
+
+    for (const entry of visibleEntries) {
+      if (allSelected) {
+        selectedEntryIds.delete(entry.id);
+      } else {
+        selectedEntryIds.add(entry.id);
+      }
+    }
+
+    render();
+    return;
+  }
+
+  if (action === "bulk-delete-log") {
+    await deleteSelectedEntries();
+    return;
+  }
+
+  if (action === "toggle-category") {
+    const category = button.dataset.category;
+
+    if (selectedCategories.has(category)) {
+      selectedCategories.delete(category);
+    } else {
+      selectedCategories.add(category);
+    }
+
+    render();
+    return;
+  }
+
+  if (action === "clear-categories") {
+    selectedCategories.clear();
+    render();
+    return;
+  }
+
   if (action === "log") {
     await logFood(id);
   } else if (action === "delete") {
     await deleteEntry(id);
   } else if (action === "select-week") {
+    selectedEntryIds.clear();
     selectedWeek = week;
     render();
   } else if (action === "toggle-all") {
